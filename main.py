@@ -183,11 +183,11 @@ class StockScreener:
 
     # ------------------------- Signals / Filters -------------------------
 
-    def is_daily_returns_for_last_n_days_negative(
-        self, ticker, n_days="7d", interval="1d"
+    def is_daily_returns_for_last_n_days(
+        self, ticker, n_days="7d", interval="1d", positive_returns: bool = False
     ) -> bool:
         """
-        Return True if the last `n_days` daily returns for `ticker` are all negative.
+        Return True if the last `n_days` daily returns for `ticker` are all negative (or positive if specified).
 
         Notes:
         - Uses get_daily_returns_data() to fetch daily returns.
@@ -219,12 +219,15 @@ class StockScreener:
             self.log.info(f"Normalized series for {ticker}:\n{series}")
             self.log.info(f"Series type: {type(series)}")
 
-            # Check all are negative
-            return bool((series < 0).all())
+            # Check all are positive if specified
+            if positive_returns:
+                return bool((series > 0).all())
+            else:
+                return bool((series < 0).all())
 
         except Exception as e:
             logging.error(
-                "Error in is_daily_returns_for_last_n_days_negative, Ticker:%s, %s",
+                "Error in is_daily_returns_for_last_n_days, Ticker:%s, %s",
                 ticker,
                 e,
             )
@@ -309,6 +312,7 @@ class StockScreener:
         interval: str = "1d",
         ascending: bool = True,
         round_digits: int = 6,
+        positive_returns: bool = False,
     ):
         """
         Rank tickers after filtering by skewness and consecutive negative daily returns.
@@ -331,6 +335,7 @@ class StockScreener:
             interval (str): Interval for return data (e.g. "1d")
             ascending (bool): True → smaller cumulative rank = better
             round_digits (int): Decimal precision for ranks
+            positive_returns (bool): If True, filter for positive returns instead of negative
         """
 
         if not criteria_weights:
@@ -358,8 +363,11 @@ class StockScreener:
                 continue  # skip if skew > 0
 
             try:
-                if self.is_daily_returns_for_last_n_days_negative(
-                    ticker, n_days=n_days, interval=interval
+                if self.is_daily_returns_for_last_n_days(
+                    ticker,
+                    n_days=n_days,
+                    interval=interval,
+                    positive_returns=positive_returns,
                 ):
                     filtered_tickers.append(ticker)
             except Exception as e:
@@ -426,6 +434,7 @@ class StockScreener:
         interval: str = "1d",
         n_days: str = "7d",
         criteria_weights: dict | None = None,
+        positive_returns: bool = False,
     ):
         """
         Loop over names in input_excel_path['Name'], resolve tickers, compute metrics and
@@ -504,6 +513,7 @@ class StockScreener:
                     n_days=n_days,
                     interval=interval,
                     ascending=False,
+                    positive_returns=positive_returns,
                 )
                 return ranked
 
@@ -512,97 +522,6 @@ class StockScreener:
         except Exception as e:
             logging.error("Error in process_constituents: %s", e)
             raise
-
-
-# Filter Test
-# stock_exchanges = lookup_stock(name="Al Rajhi Bank")
-# ticker = filter_exchange(stock_exchange_dict=stock_exchanges)
-# daily_returns_std_dev = get_daily_returns_std_dev(
-#     ticker=ticker, period="5d", interval="1d"
-# )
-# volume_mean = get_ticker_volume_mean(ticker=ticker, period="5d", interval="1d")
-# print(volume_mean)
-# daily_returns_skew = get_daily_returns_skewness(
-#     ticker=ticker, period="5d", interval="1d"
-# )
-
-# #  Test Excel
-# # 1️⃣ Ensure the directory exists (create if not)
-# os.makedirs("outputs", exist_ok=True)
-
-# # 2️⃣ Define your file path
-# excel_file_path = os.path.join("outputs", "screen_metrics.xlsx")
-
-
-# res1 = update_metrics_excel(
-#     excel_path=excel_file_path,
-#     metric_name="Standard Deviation",
-#     metric_dict={"AAPL": 0.062345},
-# )
-# res2 = update_metrics_excel(
-#     excel_path=excel_file_path,
-#     metric_name="Skewness",
-#     metric_dict={"AAPL": -0.523456},
-# )
-# res3 = update_metrics_excel(
-#     excel_path=excel_file_path,
-#     metric_name="Volume",
-#     metric_dict={"AAPL": 123456},
-# )
-# res4 = update_metrics_excel(
-#     excel_path=excel_file_path,
-#     metric_name="Standard Deviation",
-#     metric_dict=daily_returns_std_dev,
-# )
-# res5 = update_metrics_excel(
-#     excel_path=excel_file_path,
-#     metric_name="Skewness",
-#     metric_dict=daily_returns_skew,  # {ticker: value}
-# )
-# res6 = update_metrics_excel(
-#     excel_path=excel_file_path,
-#     metric_name="Volume",
-#     metric_dict=volume_mean,
-# )
-# res7 = update_metrics_excel(
-#     excel_path=excel_file_path,
-#     metric_name="Skewness",
-#     metric_dict={"IBM": 0.523456},
-# )
-# res8 = update_metrics_excel(
-#     excel_path=excel_file_path,
-#     metric_name="Standard Deviation",
-#     metric_dict={"IBM": 0.0023450},
-# )
-# res9 = update_metrics_excel(
-#     excel_path=excel_file_path,
-#     metric_name="Volume",
-#     metric_dict={"IBM": 23450},
-# )
-
-# print(f"res1:\n{res1.tail()}")
-# print(f"res2:\n{res2.tail()}")
-# print(f"res3:\n{res3.tail()}")
-# print(f"res4:\n{res4.tail()}")
-# print(f"res5:\n{res5.tail()}")
-# print(f"res6:\n{res6.tail()}")
-# print(f"res7:\n{res7.tail()}")
-# print(f"res8:\n{res8.tail()}")
-# print(f"res9:\n{res9.tail()}")
-
-# criteria_weights = {"Standard Deviation": 0.75, "Volume": 0.25}
-
-# ranked_df = rank_tickers_by_criteria_filtered(
-#     excel_path=excel_file_path,
-#     sheet_name="Metrics",
-#     ranking_sheet_name="Filtered_Ranking",
-#     criteria_weights=criteria_weights,
-#     n_days="7d",
-#     interval="1d",
-#     ascending=False,  # higher score = better rank
-# )
-
-# print(ranked_df)
 
 
 if __name__ == "__main__":
@@ -614,36 +533,52 @@ if __name__ == "__main__":
     print(f"Input file: {input_file}")
     print(f"Output file: {output_file}")
 
-    # example weights (tune as needed)
-    criteria_weights = {"Standard Deviation": 0.75, "Volume": 0.25}
-    screener = StockScreener(preferred_exchange=EXCHANGE)
+    # parameter file (edit this file to change run parameters)
+    params_path = Path("parameter.json")
+
+    # load parameters
+    with params_path.open("r", encoding="utf-8") as f:
+        params = json.load(f)
+
+    period = params.get("period", "5d")
+    interval = params.get("interval", "1d")
+    n_days = params.get("n_days", "7d")
+    criteria_weights = params.get("criteria_weights")
+    preferred_exchange = params.get("preferred_exchange", EXCHANGE)
+    filter_positive_returns = params.get("filter_positive_returns", False)
+
+    print(f"Period: {period}, Interval: {interval}, n_days: {n_days}")
+    print(f"Criteria weights: {criteria_weights}")
+    print(f"Preferred exchange: {preferred_exchange}")
+
+    screener = StockScreener(preferred_exchange=preferred_exchange)
 
     # run
-    ranked_df = screener.process_constituents(
-        input_excel_path=input_file,
-        output_excel_path=output_file,
-        period="5d",
-        interval="1d",
-        n_days="7d",
-        criteria_weights=criteria_weights,
-    )
-    if ranked_df is not None:
-        print("Ranking completed. Top rows:")
-        print(ranked_df.head())
+    # ranked_df = screener.process_constituents(
+    #     input_excel_path=input_file,
+    #     output_excel_path=output_file,
+    #     period="5d",
+    #     interval="1d",
+    #     n_days="7d",
+    #     criteria_weights=criteria_weights,
+    # )
+    # if ranked_df is not None:
+    #     print("Ranking completed. Top rows:")
+    #     print(ranked_df.head())
 
     # excel_file_path = os.path.join("outputs", "screen_metrics.xlsx")
 
     # screener = StockScreener(preferred_exchange=EXCHANGE)
 
-    # # Ranking directly from existing Metrics sheet
-    # criteria_weights = {"Standard Deviation": 0.75, "Volume": 0.25}
-    # ranked_df = screener.rank_tickers_by_criteria_filtered(
-    #     excel_path=excel_file_path,
-    #     sheet_name="Metrics",
-    #     ranking_sheet_name="Filtered_Ranking",
-    #     criteria_weights=criteria_weights,
-    #     n_days="7d",
-    #     interval="1d",
-    #     ascending=False,  # keep current behavior
-    # )
-    # print(ranked_df)
+    # Ranking directly from existing Metrics sheet
+    ranked_df = screener.rank_tickers_by_criteria_filtered(
+        excel_path=output_file,
+        sheet_name="Metrics",
+        ranking_sheet_name="Filtered_Ranking",
+        criteria_weights=criteria_weights,
+        n_days=n_days,
+        interval=interval,
+        ascending=False,  # keep current behavior
+        positive_returns=filter_positive_returns,
+    )
+    print(ranked_df)

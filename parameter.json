@@ -1,0 +1,11 @@
+{
+  "period": "1y",
+  "interval": "1d",
+  "n_days": "7d",
+  "criteria_weights": {
+    "Standard Deviation": 0.75,
+    "Volume": 0.25
+  },
+  "preferred_exchange": "NSI",
+  "filter_positive_returns": true
+}
